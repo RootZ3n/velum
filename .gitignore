@@ -1,1 +1,6 @@
-node_modules/\ndist/\n*.js\n*.d.ts\n!src/**/*.ts
+node_modules/
+dist/
+*.tsbuildinfo
+.DS_Store
+state/
+*.log
