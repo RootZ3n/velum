@@ -66,6 +66,13 @@ export function configFromEnv(env: NodeJS.ProcessEnv = process.env): Partial<Vel
     const lvl = Number(env["VELUM_DEFAULT_PII_LEVEL"]);
     if (lvl === 1 || lvl === 2 || lvl === 3) out.defaultPiiLevel = lvl as PiiLevel;
   }
+  if (env["VELUM_OUTPUT_PII_LEVEL"] !== undefined) {
+    const lvl = Number(env["VELUM_OUTPUT_PII_LEVEL"]);
+    if (lvl === 1 || lvl === 2 || lvl === 3) out.outputPiiLevel = lvl as PiiLevel;
+  }
+  if (env["VELUM_DETECT_NAMES"] !== undefined) {
+    out.detectNames = env["VELUM_DETECT_NAMES"] !== "false" && env["VELUM_DETECT_NAMES"] !== "0";
+  }
   if (env["VELUM_CREDENTIAL_BUFFER_TTL_MS"] !== undefined) {
     const ttl = Number(env["VELUM_CREDENTIAL_BUFFER_TTL_MS"]);
     if (Number.isFinite(ttl) && ttl > 0) out.credentialBufferTtlMs = ttl;
@@ -107,6 +114,10 @@ export function parseConfigYaml(text: string): Partial<VelumConfig> {
   if (obj["defaultPiiLevel"] === 1 || obj["defaultPiiLevel"] === 2 || obj["defaultPiiLevel"] === 3) {
     out.defaultPiiLevel = obj["defaultPiiLevel"] as PiiLevel;
   }
+  if (obj["outputPiiLevel"] === 1 || obj["outputPiiLevel"] === 2 || obj["outputPiiLevel"] === 3) {
+    out.outputPiiLevel = obj["outputPiiLevel"] as PiiLevel;
+  }
+  if (typeof obj["detectNames"] === "boolean") out.detectNames = obj["detectNames"];
   if (typeof obj["credentialBufferTtlMs"] === "number") out.credentialBufferTtlMs = obj["credentialBufferTtlMs"];
   if (typeof obj["auditLogPath"] === "string") out.auditLogPath = obj["auditLogPath"];
   if (typeof obj["receiptsDir"] === "string") out.receiptsDir = obj["receiptsDir"];

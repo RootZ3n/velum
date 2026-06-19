@@ -16,6 +16,8 @@
 
 import { randomUUID } from "node:crypto";
 
+import { sanitizePii } from "./pii.js";
+
 export interface CredentialEntry {
   id: string;
   pattern: string;
@@ -55,7 +57,8 @@ export function getCredentialTtl(): number {
 
 /** Store a credential and return its opaque buffer id. */
 export function storeCredential(pattern: string, value: string, context: string): string {
-  const id = randomUUID().slice(0, 12);
+  // Full 128-bit UUID — short ids were only 44 bits of entropy (M3).
+  const id = randomUUID();
   const entry: CredentialEntry = {
     id,
     pattern,
@@ -77,7 +80,13 @@ export function storeCredential(pattern: string, value: string, context: string)
   return id;
 }
 
-/** Fetch a live (unconsumed, unexpired) entry, or null. Expired entries are evicted. */
+/**
+ * Fetch a live (unconsumed, unexpired) entry, or null. Expired entries are evicted.
+ *
+ * @internal Exposes the raw credential value — NOT part of the public API.
+ *   Use {@link consumeCredential} (single-use) or {@link getAvailableCredentials}
+ *   (metadata only) instead.
+ */
 export function getCredential(id: string): CredentialEntry | null {
   const entry = buffer.get(id);
   if (!entry) return null;
@@ -111,7 +120,9 @@ export function getAvailableCredentials(pattern?: string): CredentialMetadata[] 
     results.push({
       id: entry.id,
       pattern: entry.pattern,
-      context: entry.context,
+      // M2 — the context window can capture adjacent PII (emails, names);
+      // scrub it before exposing metadata.
+      context: sanitizePii(entry.context),
       createdAt: entry.createdAt,
       ttlMs: entry.ttlMs,
       consumed: entry.consumed,

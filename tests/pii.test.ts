@@ -40,8 +40,13 @@ test("detects IP_ADDRESS", () => {
   assert.ok(d.some((x) => x.type === "IP_ADDRESS" && x.value === "192.168.1.100"));
 });
 
-test("detects NAME", () => {
+test("NAME detection is opt-in (disabled by default)", () => {
   const d = scanPii("the engineer John Smith approved it");
+  assert.ok(!d.some((x) => x.type === "NAME"), "NAME not detected by default");
+});
+
+test("detects NAME when detectNames enabled", () => {
+  const d = scanPii("the engineer John Smith approved it", undefined as never, { detectNames: true });
   assert.ok(d.some((x) => x.type === "NAME" && x.value === "John Smith"));
 });
 

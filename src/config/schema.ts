@@ -15,6 +15,10 @@ export interface VelumConfig {
   enabled: boolean;
   /** Default PII level applied when a module has no override. */
   defaultPiiLevel: PiiLevel;
+  /** PII redaction level for model output. Defaults to defaultPiiLevel (H5). */
+  outputPiiLevel?: PiiLevel;
+  /** Enable NAME PII detection (off by default — noisy without context, M5). */
+  detectNames?: boolean;
   /** Extra patterns added to the registry at startup. */
   customPatterns?: PatternDefinition[];
   /** Extra known-safe terms merged into the registry's neverRedact set. */
@@ -52,6 +56,12 @@ export function validateConfig(input: Partial<VelumConfig> | undefined, defaults
   }
   if (!isPiiLevel(cfg.defaultPiiLevel)) {
     throw new VelumConfigError(`'defaultPiiLevel' must be 1, 2, or 3, got ${String(cfg.defaultPiiLevel)}`);
+  }
+  if (cfg.outputPiiLevel !== undefined && !isPiiLevel(cfg.outputPiiLevel)) {
+    throw new VelumConfigError(`'outputPiiLevel' must be 1, 2, or 3, got ${String(cfg.outputPiiLevel)}`);
+  }
+  if (cfg.detectNames !== undefined && typeof cfg.detectNames !== "boolean") {
+    throw new VelumConfigError("'detectNames' must be a boolean");
   }
   if (cfg.credentialBufferTtlMs !== undefined) {
     if (typeof cfg.credentialBufferTtlMs !== "number" || cfg.credentialBufferTtlMs <= 0) {
