@@ -53,7 +53,38 @@ out.blocked;  // true if a secret was about to leak
 out.text;     // safe text (refusal on block, redacted on warn, original otherwise)
 ```
 
-### One configured instance (recommended)
+### Pipeline API (recommended)
+
+`guardRequest` and `guardResponse` wire all three stages together in two calls:
+
+```ts
+import { guardRequest, guardResponse, createVelum } from "velum-ai";
+
+const velum = createVelum({ defaultPiiLevel: 2 });
+
+// On the way in — scans user message for credentials + injection, scans context messages for PII + injection
+const req = guardRequest({
+  input: "my password is hunter2 and my email is test@example.com",
+  messages: [
+    { role: "system", content: "You are helpful." },
+    { role: "user", content: "Also my SSN is 078-05-1120" },
+  ],
+}, velum);
+
+req.blocked;         // true if a credential or injection was found that blocks
+req.input;           // sanitized (credential redacted, PII masked)
+req.messages;        // context messages with PII redacted
+req.warnings;        // ["CREDENTIAL detected", "PII detected: email"]
+req.bufferIds;       // ["abc123..."] — retrieve the real value later
+
+// On the way out — scans model response for leaked secrets
+const res = guardResponse("The user's SSN is 078-05-1120", req.bufferIds, velum);
+res.blocked;         // true if a secret was about to leak
+res.text;            // safe text (refusal on block, redacted on warn)
+res.warnings;        // ["SECRET_LEAK detected"]
+```
+
+### One configured instance
 
 `createVelum()` gives you a configured bundle with its own pattern registry:
 
