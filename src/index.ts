@@ -90,3 +90,13 @@ export {
 export { createVelum, type Velum } from "./adapters/generic.js";
 export { velumExpress, type VelumExpressOptions } from "./adapters/express.js";
 export { velumFastify, type VelumFastifyOptions } from "./adapters/fastify.js";
+
+// ── Pipeline ──
+export {
+  guardRequest,
+  guardResponse,
+  type GuardRequestInput,
+  type GuardRequestResult,
+  type GuardResponseInput,
+  type GuardResponseResult,
+} from "./core/pipeline.js";
