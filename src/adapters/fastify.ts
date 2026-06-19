@@ -40,11 +40,11 @@ interface FastifyLike {
   decorateRequest?: (name: string, value: unknown) => void;
   addHook(
     name: "onRequest" | "preHandler",
-    handler: (req: FastifyRequestLike, reply: unknown, done: HookDone) => void,
+    handler: (req: any, reply: any, done: HookDone) => void,
   ): void;
   addHook(
     name: "onSend",
-    handler: (req: FastifyRequestLike, reply: unknown, payload: unknown, done: (err: unknown, payload?: unknown) => void) => void,
+    handler: (req: any, reply: any, payload: any, done: (err: unknown, payload?: any) => void) => void,
   ): void;
 }
 
