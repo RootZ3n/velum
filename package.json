@@ -1,6 +1,6 @@
 {
   "name": "velum-ai",
-  "version": "0.1.0",
+  "version": "0.2.1",
   "description": "AI Privacy & Injection Defense — prompt-injection classification, three-stage trust guard, PII masking, and a short-lived credential buffer. Zero dependencies.",
   "type": "module",
   "main": "dist/index.js",
