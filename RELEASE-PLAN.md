@@ -20,7 +20,7 @@ All products: MIT license, open source, github.com/RootZ3n/*
 - Ships standalone alongside all releases
 - Integrated into every product as standard
 - Zero dependencies, MIT license
-- Repo: /pehverse/repos/velum
+- Repo: /pehverse/repos/ecosystem/velum
 
 ## Principles
 
