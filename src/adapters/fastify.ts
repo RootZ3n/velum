@@ -19,6 +19,7 @@ import { createVelum, type Velum } from "./generic.js";
 import type { VelumConfig } from "../config/schema.js";
 import type { ContextScanInput } from "../core/guard.js";
 import type { ClassificationResult } from "../core/classify.js";
+import { registry as defaultRegistry, ensureGlobal } from "../core/patterns.js";
 
 export interface VelumFastifyOptions extends Partial<VelumConfig> {
   inCharacter?: boolean;
@@ -89,7 +90,10 @@ export function velumFastify(fastify: FastifyLike, opts: VelumFastifyOptions = {
     try {
       done(null, guardPayload(velum, payload, inCharacter));
     } catch {
-      done(null, payload);
+      // Fail-closed for credentials: strip known credential patterns from
+      // the raw payload before returning it, so a guard crash never leaks
+      // a secret verbatim.
+      done(null, stripCredentialPatterns(payload));
     }
   });
 }
@@ -121,6 +125,37 @@ function guardObject(velum: Velum, payload: unknown, inCharacter: boolean): unkn
       }
     }
     return obj;
+  }
+  return payload;
+}
+
+/**
+ * Last-resort credential stripping when the full guard throws. Walks the
+ * payload and replaces any string that matches a known credential pattern
+ * with [REDACTED-SECRET]. This is a best-effort fallback — it does NOT
+ * catch all secrets, only those in Velum's pattern registry.
+ */
+function stripCredentialPatterns(payload: unknown): unknown {
+  const CREDENTIAL_PLACEHOLDER = "[REDACTED-SECRET]";
+  if (typeof payload === "string") {
+    let out = payload;
+    for (const def of defaultRegistry.credentialPatterns) {
+      const re = ensureGlobal(def.pattern);
+      re.lastIndex = 0;
+      if (re.test(out)) {
+        re.lastIndex = 0;
+        out = out.replace(re, CREDENTIAL_PLACEHOLDER);
+      }
+    }
+    return out;
+  }
+  if (Array.isArray(payload)) return payload.map(stripCredentialPatterns);
+  if (payload && typeof payload === "object") {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(payload as Record<string, unknown>)) {
+      out[k] = stripCredentialPatterns(v);
+    }
+    return out;
   }
   return payload;
 }

@@ -13,7 +13,10 @@ test("velumHealthCheck returns service velum", () => {
   assert.equal(result.service, "velum");
 });
 
-test("velumHealthCheck returns stable shape", () => {
+test("velumHealthCheck returns stable shape with version", () => {
   const result = velumHealthCheck();
-  assert.deepEqual(result, { status: "ok", service: "velum" });
+  assert.equal(result.status, "ok");
+  assert.equal(result.service, "velum");
+  assert.equal(typeof result.version, "string");
+  assert.ok(result.version.length > 0, "version should not be empty");
 });

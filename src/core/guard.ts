@@ -311,10 +311,14 @@ function scanContextString(
 
 // ── Stage 3: OUTPUT ──────────────────────────────────────────────────────────
 
+/** Maximum bytes of output text to scan. Responses exceeding this are
+ *  truncated before scanning to prevent resource exhaustion. 1 MiB default. */
+const MAX_OUTPUT_SCAN_BYTES = 1 * 1024 * 1024;
+
 export function scanOutput(
   text: string,
   registry: PatternRegistry = defaultRegistry,
-  opts: { outputPiiLevel?: PiiLevel } = {},
+  opts: { outputPiiLevel?: PiiLevel; maxScanBytes?: number } = {},
 ): ScanResult {
   const reasons: string[] = [];
   const flags: string[] = [];
@@ -322,13 +326,25 @@ export function scanOutput(
   const source = text ?? "";
   if (!source) return { decision, reasons, flags };
 
-  let redacted = source;
+  // Cap the scanned region to prevent resource exhaustion on huge outputs.
+  const maxBytes = opts.maxScanBytes ?? MAX_OUTPUT_SCAN_BYTES;
+  let scanRegion: string;
+  if (Buffer.byteLength(source, "utf-8") > maxBytes) {
+    scanRegion = Buffer.from(source, "utf-8").subarray(0, maxBytes).toString("utf-8");
+    flags.push("OUTPUT_TRUNCATED");
+    reasons.push(`output:truncated(${maxBytes} bytes)`);
+    decision = maxDecision(decision, "warn");
+  } else {
+    scanRegion = source;
+  }
+
+  let redacted = scanRegion;
   let didRedact = false;
 
   // Secrets in output are an immediate block + redact.
   for (const def of registry.credentialPatterns) {
     const re = ensureGlobal(def.pattern);
-    const matches = source.match(reset(re));
+    const matches = scanRegion.match(reset(re));
     if (matches && matches.length > 0) {
       flags.push(def.name);
       reasons.push(`output:${def.name}(${matches.length})`);
@@ -340,7 +356,7 @@ export function scanOutput(
 
   // Policy-weakening patterns → review (operators should see them).
   for (const def of registry.policyPatterns) {
-    if (reset(def.pattern).test(source)) {
+    if (reset(def.pattern).test(scanRegion)) {
       flags.push(def.name);
       reasons.push(`output:${def.name}`);
       decision = maxDecision(decision, "review");

@@ -5,9 +5,24 @@
  * ============================================================
  */
 
+import { readFileSync } from "node:fs";
+
+/** Read the real version from package.json (avoids hardcoded drift). */
+function readVersion(): string {
+  try {
+    const pkg = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf-8")) as { version?: string };
+    return pkg.version ?? "0.0.0";
+  } catch {
+    return "0.0.0";
+  }
+}
+
+const VERSION = readVersion();
+
 export interface HealthCheckResult {
   status: "ok";
   service: "velum";
+  version: string;
 }
 
 /**
@@ -15,5 +30,5 @@ export interface HealthCheckResult {
  * is alive and operational.
  */
 export function velumHealthCheck(): HealthCheckResult {
-  return { status: "ok", service: "velum" };
+  return { status: "ok", service: "velum", version: VERSION };
 }
