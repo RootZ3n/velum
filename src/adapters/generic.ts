@@ -33,6 +33,7 @@ import {
   type CredentialMetadata,
 } from "../core/credential-buffer.js";
 import { createRegistry, type PatternRegistry } from "../core/patterns.js";
+import { guardToolCall as coreGuardToolCall, type GuardToolCallInput, type GuardToolCallResult } from "../core/tool-guard.js";
 import { loadConfig, applyRuntimeConfig } from "../config/defaults.js";
 import type { VelumConfig } from "../config/schema.js";
 
@@ -55,6 +56,13 @@ export interface Velum {
   /** Consume (single-use) a buffered credential value by id. */
   getCredential(id: string): string | null;
   getAvailableCredentials(pattern?: string): CredentialMetadata[];
+
+  /**
+   * Guard a tool call: scan args for injection/secrets, resolve credential
+   * placeholders from the buffer, and (when `dispatch` is given) scan the
+   * return value. Uses this instance's registry.
+   */
+  guardToolCall(input: GuardToolCallInput): Promise<GuardToolCallResult>;
 }
 
 /**
@@ -97,6 +105,18 @@ export function createVelum(config?: Partial<VelumConfig>): Velum {
 
     getCredential: (id) => consumeCredential(id),
     getAvailableCredentials: (pattern) => getAvailableCredentials(pattern),
+    guardToolCall: (input) =>
+      resolved.enabled
+        ? coreGuardToolCall(input, registry)
+        : Promise.resolve({
+            toolName: input.toolName,
+            allowed: true,
+            decision: "allow" as const,
+            resolvedArgs: input.args,
+            argsScan: allow(),
+            reasons: [],
+            scanResult: (value: unknown) => ({ value, scan: allow() }),
+          }),
   };
 }
 

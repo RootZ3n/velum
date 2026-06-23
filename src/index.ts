@@ -21,13 +21,33 @@ export {
   scanContext,
   scanOutput,
   applyOutputGuardSync,
+  createOutputStreamGuard,
   type Decision,
   type Stage,
   type ScanResult,
   type ContextScanInput,
   type ContextScanResult,
   type OutputGuardResult,
+  type OutputStreamGuard,
+  type OutputStreamGuardOptions,
 } from "./core/guard.js";
+
+// ── Core: guarded tool calls ──
+export {
+  guardToolCall,
+  CREDENTIAL_PLACEHOLDER,
+  type GuardToolCallInput,
+  type GuardToolCallResult,
+} from "./core/tool-guard.js";
+
+// ── Core: audit receipts ──
+export {
+  emitReceipt,
+  configureReceipts,
+  getReceiptConfig,
+  type Receipt,
+  type ReceiptStage,
+} from "./core/receipts.js";
 
 // ── Core: PII ──
 export {
@@ -85,6 +105,13 @@ export {
   parseConfigYaml,
   type LoadConfigOptions,
 } from "./config/defaults.js";
+export {
+  loadPatternPack,
+  parsePatternPack,
+  applyPatternPack,
+  type PatternPack,
+  type PatternPackEntry,
+} from "./config/pattern-pack.js";
 
 // ── Adapters ──
 export { createVelum, type Velum } from "./adapters/generic.js";

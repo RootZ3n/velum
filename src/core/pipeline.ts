@@ -23,6 +23,7 @@ import {
 } from "./guard.js";
 import { processWithPii, demask, sanitizePii, type PiiLevel, type PiiResult } from "./pii.js";
 import { type PatternRegistry, registry as defaultRegistry } from "./patterns.js";
+import { emitReceipt } from "./receipts.js";
 
 // ── Request pipeline ─────────────────────────────────────────────────────────
 
@@ -127,6 +128,13 @@ export function guardRequest(input: GuardRequestInput = {}): GuardRequestResult 
     piiResult = { detections: [], masked: false, level: piiLevel };
   }
 
+  emitReceipt({
+    stage: "request",
+    decision: overallDecision,
+    patterns: [...inputResult.patternsMatched, ...contextResult.flags],
+    counts: { credentials: credentialBufferIds.length, piiMasked: placeholderMap ? placeholderMap.size : 0 },
+  });
+
   return {
     input: {
       classification: inputResult,
@@ -200,6 +208,7 @@ export function guardResponse(input: GuardResponseInput = {}): GuardResponseResu
     }
 
     const objText = typeof safeObj === "string" ? safeObj : JSON.stringify(safeObj);
+    emitReceipt({ stage: "response", decision: deepResult.scan.decision, patterns: deepResult.scan.flags });
     return {
       text: objText,
       object: safeObj,
@@ -225,6 +234,7 @@ export function guardResponse(input: GuardResponseInput = {}): GuardResponseResu
     text = demask(text, input.piiPlaceholderMap);
   }
 
+  emitReceipt({ stage: "response", decision: guardResult.scan.decision, patterns: guardResult.scan.flags });
   return {
     text,
     outputScan: guardResult.scan,

@@ -13,6 +13,8 @@ import { readFileSync, existsSync } from "node:fs";
 import { validateConfig, type VelumConfig, type PiiLevel } from "./schema.js";
 import { setCredentialTtl, DEFAULT_TTL_MS } from "../core/credential-buffer.js";
 import { registry as defaultRegistry, type PatternRegistry } from "../core/patterns.js";
+import { configureReceipts } from "../core/receipts.js";
+import { loadPatternPack, applyPatternPack } from "./pattern-pack.js";
 
 export const DEFAULT_CONFIG: VelumConfig = {
   enabled: true,
@@ -82,6 +84,9 @@ export function configFromEnv(env: NodeJS.ProcessEnv = process.env): Partial<Vel
   if (env["VELUM_NEVER_REDACT"]) {
     out.neverRedact = env["VELUM_NEVER_REDACT"].split(",").map((s) => s.trim()).filter(Boolean);
   }
+  if (env["VELUM_PATTERN_PACKS"]) {
+    out.patternPacks = env["VELUM_PATTERN_PACKS"].split(",").map((s) => s.trim()).filter(Boolean);
+  }
   return out;
 }
 
@@ -99,6 +104,19 @@ export function applyRuntimeConfig(config: VelumConfig, registry: PatternRegistr
   if (config.customPatterns) {
     for (const def of config.customPatterns) registry.addPattern(def);
   }
+  // Load shareable pattern packs (each product version-controls its own).
+  if (config.patternPacks) {
+    for (const path of config.patternPacks) {
+      try {
+        applyPatternPack(loadPatternPack(path), registry);
+      } catch (err) {
+        // eslint-disable-next-line no-console
+        console.warn(`[velum] failed to load pattern pack '${path}': ${(err as Error).message}`);
+      }
+    }
+  }
+  // Enable audit receipts when an audit log path is configured.
+  configureReceipts({ auditLogPath: config.auditLogPath });
 }
 
 // ── Minimal YAML reader (zero-dependency subset) ─────────────────────────────
@@ -122,6 +140,7 @@ export function parseConfigYaml(text: string): Partial<VelumConfig> {
   if (typeof obj["auditLogPath"] === "string") out.auditLogPath = obj["auditLogPath"];
   if (typeof obj["receiptsDir"] === "string") out.receiptsDir = obj["receiptsDir"];
   if (Array.isArray(obj["neverRedact"])) out.neverRedact = obj["neverRedact"].map(String);
+  if (Array.isArray(obj["patternPacks"])) out.patternPacks = obj["patternPacks"].map(String);
   if (typeof obj["modules"] === "object" && obj["modules"] !== null) {
     const modules: Record<string, { piiLevel?: PiiLevel }> = {};
     for (const [name, val] of Object.entries(obj["modules"] as Record<string, unknown>)) {

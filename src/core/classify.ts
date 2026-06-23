@@ -23,6 +23,7 @@
 import { registry as defaultRegistry, ensureGlobal, type PatternRegistry } from "./patterns.js";
 import { storeCredential } from "./credential-buffer.js";
 import { normalizeForScanning } from "./normalize.js";
+import { emitReceipt } from "./receipts.js";
 
 export type Classification =
   | "SAFE"
@@ -202,6 +203,13 @@ export function classify(
       for (const p of inj.patterns) if (!patternsMatched.includes(p)) patternsMatched.push(p);
       warnings.push(`Injection patterns also detected after redaction: ${inj.patterns.join(", ")}`);
     }
+    emitReceipt({
+      stage: "input",
+      decision: "CREDENTIAL",
+      patterns: patternsMatched,
+      counts: { redacted: credentialBufferIds.length },
+      sessionId,
+    });
     return {
       classification: "CREDENTIAL",
       action: "redacted",
@@ -215,6 +223,7 @@ export function classify(
   // ── 2. Injection / override detection (flag, don't redact) ──
   const inj = detectInjection(source, registry);
   if (inj.patterns.length > 0) {
+    emitReceipt({ stage: "input", decision: inj.classification, patterns: inj.patterns, sessionId });
     return {
       classification: inj.classification,
       action: "flagged",
@@ -226,6 +235,7 @@ export function classify(
   }
 
   // ── 3. Safe ──
+  emitReceipt({ stage: "input", decision: "SAFE", sessionId });
   return {
     classification: "SAFE",
     action: "passed",

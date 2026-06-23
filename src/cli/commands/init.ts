@@ -3,7 +3,9 @@
  */
 
 import { writeFileSync, existsSync } from "node:fs";
-import { resolve } from "node:path";
+import { resolve, dirname, basename } from "node:path";
+
+import { PRESETS, renderPresetConfig, listPresets } from "../presets.js";
 
 export const CONFIG_TEMPLATE = `# Velum configuration
 # AI Privacy & Injection Defense — https://www.npmjs.com/package/velum-ai
@@ -42,6 +44,8 @@ export interface InitOptions {
   cwd?: string;
   force?: boolean;
   path?: string;
+  /** Product preset name (nusika, toba, looney-luna). */
+  preset?: string;
 }
 
 export async function runInit(options: InitOptions = {}): Promise<number> {
@@ -51,6 +55,26 @@ export async function runInit(options: InitOptions = {}): Promise<number> {
   if (existsSync(target) && !options.force) {
     process.stderr.write(`velum init: ${target} already exists. Use --force to overwrite.\n`);
     return 1;
+  }
+
+  // ── Preset mode: write a product config + its shareable pattern pack ──
+  if (options.preset) {
+    const preset = PRESETS[options.preset];
+    if (!preset) {
+      process.stderr.write(`velum init: unknown preset '${options.preset}'.\n\nAvailable presets:\n${listPresets()}\n`);
+      return 1;
+    }
+    const packFileName = `velum-pack.${preset.name}.json`;
+    const packPath = resolve(dirname(target), packFileName);
+    if (existsSync(packPath) && !options.force) {
+      process.stderr.write(`velum init: ${packPath} already exists. Use --force to overwrite.\n`);
+      return 1;
+    }
+    writeFileSync(target, renderPresetConfig(preset, basename(packFileName)), "utf-8");
+    writeFileSync(packPath, JSON.stringify(preset.pack, null, 2) + "\n", "utf-8");
+    process.stdout.write(`✓ Wrote ${target} (preset: ${preset.name})\n`);
+    process.stdout.write(`✓ Wrote ${packPath}\n`);
+    return 0;
   }
 
   writeFileSync(target, CONFIG_TEMPLATE, "utf-8");

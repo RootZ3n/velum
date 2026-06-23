@@ -29,6 +29,8 @@ export interface VelumConfig {
   auditLogPath?: string;
   /** Directory for JSONL receipts (optional). */
   receiptsDir?: string;
+  /** Paths to shareable pattern-pack JSON files loaded at startup. */
+  patternPacks?: string[];
   /** Per-module overrides keyed by module/route name. */
   modules?: Record<string, VelumModuleConfig>;
 }
@@ -70,6 +72,9 @@ export function validateConfig(input: Partial<VelumConfig> | undefined, defaults
   }
   if (cfg.neverRedact !== undefined && !Array.isArray(cfg.neverRedact)) {
     throw new VelumConfigError("'neverRedact' must be an array of strings");
+  }
+  if (cfg.patternPacks !== undefined && !Array.isArray(cfg.patternPacks)) {
+    throw new VelumConfigError("'patternPacks' must be an array of file paths");
   }
   if (cfg.modules !== undefined) {
     for (const [name, mod] of Object.entries(cfg.modules)) {

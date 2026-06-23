@@ -23,6 +23,7 @@ import {
 } from "./patterns.js";
 import { normalizeForScanning } from "./normalize.js";
 import { scanPii, sanitizePii, type PiiLevel } from "./pii.js";
+import { emitReceipt } from "./receipts.js";
 
 export type Decision = "allow" | "warn" | "review" | "block";
 export type Stage = "input" | "context" | "output";
@@ -157,6 +158,9 @@ export function scanInput(text: string, registry: PatternRegistry = defaultRegis
       decision = maxDecision(decision, severityToDecision[def.severity]);
     }
   }
+  if (decision !== "allow" || flags.length > 0) {
+    emitReceipt({ stage: "input", decision, patterns: flags });
+  }
   return { decision, reasons, flags };
 }
 
@@ -264,6 +268,14 @@ export function scanContext(
       .join("\n");
     result.redactedMessages = redactedMessages;
   }
+  if (decision !== "allow" || flags.length > 0) {
+    emitReceipt({
+      stage: "context",
+      decision,
+      patterns: flags,
+      counts: didRedact ? { redacted: 1 } : {},
+    });
+  }
   return result;
 }
 
@@ -352,6 +364,14 @@ export function scanOutput(
 
   const result: ScanResult = { decision, reasons, flags };
   if (didRedact) result.redacted = redacted;
+  if (decision !== "allow" || flags.length > 0) {
+    emitReceipt({
+      stage: "output",
+      decision,
+      patterns: flags,
+      counts: didRedact ? { redacted: 1 } : {},
+    });
+  }
   return result;
 }
 
@@ -387,6 +407,88 @@ export function applyOutputGuardSync(
     return { text: scan.redacted, scan, blocked: false, redacted: true };
   }
   return { text: text ?? "", scan, blocked: false, redacted: false };
+}
+
+// ── Streaming output guard ────────────────────────────────────────────────────
+// Token-by-token LLM output breaks the single-string assumption: a secret split
+// across two SSE chunks ("sk-" … "XXXX") passes both chunk scans undetected, and
+// buffering the whole response defeats streaming. createOutputStreamGuard keeps a
+// sliding tail-buffer sized to the longest credential we care about and only
+// releases bytes that cannot be part of a not-yet-complete match.
+
+/** Upper bound on a credential match we hold back across chunks. */
+const STREAM_TAIL_BYTES = 512;
+
+export interface OutputStreamGuard {
+  /** Feed a streamed chunk; returns the bytes safe to forward (may be ""). */
+  push(chunk: string): string;
+  /** Call once the stream ends; returns the guarded remaining tail. */
+  flush(): string;
+  /** True once a secret was detected and the stream was closed. */
+  readonly blocked: boolean;
+}
+
+export interface OutputStreamGuardOptions extends OutputGuardOptions {
+  /** Tail window in bytes (default 512). Must exceed the longest secret match. */
+  tailBytes?: number;
+}
+
+/**
+ * Build a streaming output guard. As chunks arrive they accumulate in a buffer;
+ * the joined text is scanned so a secret spanning a chunk boundary is caught.
+ * Bytes older than the tail window can't be part of a still-forming secret (any
+ * secret touching them would already be complete and detected), so they're
+ * released. On a credential block the guard emits a single refusal and closes:
+ * every subsequent push() and the final flush() return "".
+ */
+export function createOutputStreamGuard(
+  opts: OutputStreamGuardOptions = {},
+  registry: PatternRegistry = defaultRegistry,
+): OutputStreamGuard {
+  const tail = Math.max(16, opts.tailBytes ?? STREAM_TAIL_BYTES);
+  const inCharacter = opts.inCharacter ?? false;
+  let buffer = "";
+  let closed = false;
+
+  /** True when the buffer contains a complete credential (block) match. */
+  function hasSecret(text: string): boolean {
+    const scan = scanOutput(text, registry);
+    return scan.decision === "block";
+  }
+
+  return {
+    get blocked() {
+      return closed;
+    },
+    push(chunk: string): string {
+      if (closed) return "";
+      buffer += chunk ?? "";
+
+      if (hasSecret(buffer)) {
+        closed = true;
+        buffer = "";
+        return refusalText(inCharacter);
+      }
+
+      // Release everything except the last `tail` bytes — those might be the
+      // start of a secret that completes in a later chunk.
+      if (buffer.length <= tail) return "";
+      const releaseLen = buffer.length - tail;
+      const release = buffer.slice(0, releaseLen);
+      buffer = buffer.slice(releaseLen);
+      return release;
+    },
+    flush(): string {
+      if (closed) return "";
+      const result = applyOutputGuardSync(buffer, opts, registry);
+      buffer = "";
+      if (result.blocked) {
+        closed = true;
+        return result.text; // refusal
+      }
+      return result.text; // original or redacted (PII at outputPiiLevel >= 2)
+    },
+  };
 }
 
 // ── Deep output guard (H2) ────────────────────────────────────────────────────
