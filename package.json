@@ -54,8 +54,16 @@
     "llm",
     "guard"
   ],
-  "author": "",
+  "author": "RootZ3n <rootz3n@proton.me>",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/RootZ3n/velum.git"
+  },
+  "homepage": "https://github.com/RootZ3n/velum#readme",
+  "bugs": {
+    "url": "https://github.com/RootZ3n/velum/issues"
+  },
   "engines": {
     "node": ">=18"
   },
